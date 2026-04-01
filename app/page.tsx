@@ -4,15 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
-const VALID_USERNAME = "labiscf"
-const VALID_PASSWORD = "iscf2026"
-
 export default function Home() {
-  const [loggedIn, setLoggedIn] = useState(false)
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [loginError, setLoginError] = useState('')
-
   const [data, setData] = useState<any[]>([])
   const [updateInterval, setUpdateInterval] = useState(5)
   const timerRef = useRef<any>(null)
@@ -23,25 +15,24 @@ export default function Home() {
   const [lastUpdate, setLastUpdate] = useState<string>('')
 
   useEffect(() => {
-    if (!loggedIn) return
+    const checkUser = async () => {
+      const { data } = await supabase.auth.getUser()
+      if (!data.user) {
+        window.location.href = "/login"
+      }
+    }
+    checkUser()
+  }, [])
+
+  useEffect(() => {
     fetchData()
     timerRef.current = setInterval(fetchData, updateInterval * 1000)
     return () => clearInterval(timerRef.current)
-  }, [updateInterval, loggedIn])
+  }, [updateInterval])
 
-  function handleLogin() {
-    if (username === VALID_USERNAME && password === VALID_PASSWORD) {
-      setLoggedIn(true)
-      setLoginError('')
-    } else {
-      setLoginError('Username ou password incorretos!')
-    }
-  }
-
-  function handleLogout() {
-    setLoggedIn(false)
-    setData([])
-    setAlarms([])
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    window.location.href = "/login"
   }
 
   async function fetchData() {
@@ -155,54 +146,6 @@ TEMPERATURA:
     min: Math.min(...arr).toFixed(3),
   })
 
-  // PAGINA DE LOGIN
-  if (!loggedIn) {
-    return (
-      <main className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="bg-gray-800 p-8 rounded-lg w-96 border border-gray-700">
-          <h1 className="text-2xl font-bold text-white text-center mb-2">UR5 Dashboard</h1>
-          <p className="text-gray-400 text-center text-sm mb-6">Integration of Cyber-Physical Systems</p>
-
-          <div className="mb-4">
-            <label className="text-gray-300 text-sm mb-1 block">Username</label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-              className="w-full bg-gray-700 text-white px-4 py-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500"
-              placeholder="username"
-            />
-          </div>
-
-          <div className="mb-4">
-            <label className="text-gray-300 text-sm mb-1 block">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-              className="w-full bg-gray-700 text-white px-4 py-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500"
-              placeholder="********"
-            />
-          </div>
-
-          {loginError && (
-            <p className="text-red-400 text-sm mb-4 text-center">{loginError}</p>
-          )}
-
-          <button
-            onClick={handleLogin}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded font-semibold transition-colors"
-          >
-            Entrar
-          </button>
-        </div>
-      </main>
-    )
-  }
-
-  // DASHBOARD
   return (
     <main className="p-6 bg-gray-900 min-h-screen text-white">
 
