@@ -2,22 +2,47 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+
+const VALID_USERNAME = "labiscf"
+const VALID_PASSWORD = "iscf2026"
 
 export default function Home() {
+  const [loggedIn, setLoggedIn] = useState(false)
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [loginError, setLoginError] = useState('')
+
   const [data, setData] = useState<any[]>([])
   const [updateInterval, setUpdateInterval] = useState(5)
   const timerRef = useRef<any>(null)
   const [threshold, setThreshold] = useState(2)
+  const thresholdRef = useRef(2)
   const [alarms, setAlarms] = useState<string[]>([])
   const [reportMinutes, setReportMinutes] = useState(10)
   const [lastUpdate, setLastUpdate] = useState<string>('')
 
   useEffect(() => {
+    if (!loggedIn) return
     fetchData()
     timerRef.current = setInterval(fetchData, updateInterval * 1000)
     return () => clearInterval(timerRef.current)
-  }, [updateInterval])
+  }, [updateInterval, loggedIn])
+
+  function handleLogin() {
+    if (username === VALID_USERNAME && password === VALID_PASSWORD) {
+      setLoggedIn(true)
+      setLoginError('')
+    } else {
+      setLoginError('Username ou password incorretos!')
+    }
+  }
+
+  function handleLogout() {
+    setLoggedIn(false)
+    setData([])
+    setAlarms([])
+  }
 
   async function fetchData() {
     const { data: rows, error } = await supabase
@@ -42,8 +67,13 @@ export default function Home() {
       }))
       setData(mapped)
       setLastUpdate(new Date().toLocaleTimeString())
-      checkAlarms(mapped, threshold)
+      checkAlarms(mapped, thresholdRef.current)
     }
+  }
+
+  function handleThresholdChange(value: number) {
+    setThreshold(value)
+    thresholdRef.current = value
   }
 
   function checkAlarms(rows: any[], t: number) {
@@ -53,11 +83,11 @@ export default function Home() {
     const time = new Date().toLocaleTimeString()
 
     if (Math.abs(latest.accel_x) > t)
-      newAlarms.push(`[${time}] ⚠️ Accel X: ${latest.accel_x.toFixed(3)} excedeu threshold (±${t})`)
+      newAlarms.push(`[${time}] Accel X: ${latest.accel_x.toFixed(3)} excedeu threshold (+-${t})`)
     if (Math.abs(latest.accel_y) > t)
-      newAlarms.push(`[${time}] ⚠️ Accel Y: ${latest.accel_y.toFixed(3)} excedeu threshold (±${t})`)
+      newAlarms.push(`[${time}] Accel Y: ${latest.accel_y.toFixed(3)} excedeu threshold (+-${t})`)
     if (Math.abs(latest.accel_z) > t)
-      newAlarms.push(`[${time}] ⚠️ Accel Z: ${latest.accel_z.toFixed(3)} excedeu threshold (±${t})`)
+      newAlarms.push(`[${time}] Accel Z: ${latest.accel_z.toFixed(3)} excedeu threshold (+-${t})`)
 
     if (newAlarms.length > 0) {
       setAlarms(prev => [...newAlarms, ...prev].slice(0, 20))
@@ -66,7 +96,7 @@ export default function Home() {
 
   function generateReport(minutes: number) {
     if (data.length === 0) {
-      alert('Sem dados disponíveis!')
+      alert('Sem dados disponiveis!')
       return
     }
 
@@ -87,28 +117,28 @@ export default function Home() {
     const report = `UR5 Accelerometer Report
 ========================
 Gerado em: ${new Date().toLocaleString()}
-Intervalo: últimos ${minutes} minutos
+Intervalo: ultimos ${minutes} minutos
 Total de leituras: ${useData.length}
 
 ACCEL X:
-  Média:   ${avg(xs).toFixed(4)}
-  Máximo:  ${max(xs).toFixed(4)}
-  Mínimo:  ${min(xs).toFixed(4)}
+  Media:   ${avg(xs).toFixed(4)}
+  Maximo:  ${max(xs).toFixed(4)}
+  Minimo:  ${min(xs).toFixed(4)}
 
 ACCEL Y:
-  Média:   ${avg(ys).toFixed(4)}
-  Máximo:  ${max(ys).toFixed(4)}
-  Mínimo:  ${min(ys).toFixed(4)}
+  Media:   ${avg(ys).toFixed(4)}
+  Maximo:  ${max(ys).toFixed(4)}
+  Minimo:  ${min(ys).toFixed(4)}
 
 ACCEL Z:
-  Média:   ${avg(zs).toFixed(4)}
-  Máximo:  ${max(zs).toFixed(4)}
-  Mínimo:  ${min(zs).toFixed(4)}
+  Media:   ${avg(zs).toFixed(4)}
+  Maximo:  ${max(zs).toFixed(4)}
+  Minimo:  ${min(zs).toFixed(4)}
 
 TEMPERATURA:
-  Média:   ${avg(temps).toFixed(2)}°C
-  Máximo:  ${max(temps).toFixed(2)}°C
-  Mínimo:  ${min(temps).toFixed(2)}°C
+  Media:   ${avg(temps).toFixed(2)}C
+  Maximo:  ${max(temps).toFixed(2)}C
+  Minimo:  ${min(temps).toFixed(2)}C
 `
     const blob = new Blob([report], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
@@ -125,19 +155,82 @@ TEMPERATURA:
     min: Math.min(...arr).toFixed(3),
   })
 
+  // PAGINA DE LOGIN
+  if (!loggedIn) {
+    return (
+      <main className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="bg-gray-800 p-8 rounded-lg w-96 border border-gray-700">
+          <h1 className="text-2xl font-bold text-white text-center mb-2">UR5 Dashboard</h1>
+          <p className="text-gray-400 text-center text-sm mb-6">Integration of Cyber-Physical Systems</p>
+
+          <div className="mb-4">
+            <label className="text-gray-300 text-sm mb-1 block">Username</label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+              className="w-full bg-gray-700 text-white px-4 py-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500"
+              placeholder="username"
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="text-gray-300 text-sm mb-1 block">Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+              className="w-full bg-gray-700 text-white px-4 py-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500"
+              placeholder="********"
+            />
+          </div>
+
+          {loginError && (
+            <p className="text-red-400 text-sm mb-4 text-center">{loginError}</p>
+          )}
+
+          <button
+            onClick={handleLogin}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded font-semibold transition-colors"
+          >
+            Entrar
+          </button>
+        </div>
+      </main>
+    )
+  }
+
+  // DASHBOARD
   return (
     <main className="p-6 bg-gray-900 min-h-screen text-white">
+
+      {/* Header */}
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">🤖 UR5 Accelerometer Dashboard</h1>
-        <div className="text-gray-400 text-sm">
-          {lastUpdate && `Última atualização: ${lastUpdate}`}
-          <span className="ml-2 inline-block w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+        <div>
+          <h1 className="text-3xl font-bold">UR5 Accelerometer Dashboard</h1>
+          <p className="text-gray-400 text-sm mt-1">Integration of Cyber-Physical Systems</p>
+        </div>
+        <div className="flex items-center gap-4">
+          {lastUpdate && (
+            <span className="text-gray-400 text-sm">
+              Ultima atualizacao: {lastUpdate}
+              <span className="ml-2 inline-block w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+            </span>
+          )}
+          <button
+            onClick={handleLogout}
+            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm"
+          >
+            Sair
+          </button>
         </div>
       </div>
 
-      {/* Intervalo de atualização */}
+      {/* Intervalo de atualizacao */}
       <div className="mb-6 bg-gray-800 p-4 rounded-lg flex items-center gap-4">
-        <span className="text-lg font-semibold">⏱️ Intervalo de atualização:</span>
+        <span className="text-lg font-semibold">Intervalo de atualizacao:</span>
         <input
           type="range" min="1" max="30" value={updateInterval}
           onChange={(e) => setUpdateInterval(Number(e.target.value))}
@@ -146,14 +239,14 @@ TEMPERATURA:
         <span className="text-blue-400 font-bold text-xl">{updateInterval}s</span>
       </div>
 
-      {/* Cards com últimos valores */}
+      {/* Cards */}
       {data.length > 0 && (
         <div className="grid grid-cols-4 gap-4 mb-6">
           {[
-            { label: '📡 Accel X', value: data[data.length-1].accel_x.toFixed(3), color: 'text-blue-400' },
-            { label: '📡 Accel Y', value: data[data.length-1].accel_y.toFixed(3), color: 'text-green-400' },
-            { label: '📡 Accel Z', value: data[data.length-1].accel_z.toFixed(3), color: 'text-red-400' },
-            { label: '🌡️ Temperatura', value: `${data[data.length-1].temperature?.toFixed(1)}°C`, color: 'text-yellow-400' },
+            { label: 'Accel X', value: data[data.length-1].accel_x.toFixed(3), color: 'text-blue-400' },
+            { label: 'Accel Y', value: data[data.length-1].accel_y.toFixed(3), color: 'text-green-400' },
+            { label: 'Accel Z', value: data[data.length-1].accel_z.toFixed(3), color: 'text-red-400' },
+            { label: 'Temperatura', value: `${data[data.length-1].temperature?.toFixed(1)}C`, color: 'text-yellow-400' },
           ].map((item) => (
             <div key={item.label} className="bg-gray-800 p-4 rounded-lg text-center border border-gray-700">
               <p className="text-gray-400 text-sm mb-1">{item.label}</p>
@@ -163,7 +256,7 @@ TEMPERATURA:
         </div>
       )}
 
-      {/* Estatísticas */}
+      {/* Estatisticas */}
       {data.length > 0 && (
         <div className="grid grid-cols-3 gap-4 mb-6">
           {[
@@ -174,19 +267,19 @@ TEMPERATURA:
             const s = stats(values)
             return (
               <div key={label} className={`bg-gray-800 p-4 rounded-lg border-l-4 ${color}`}>
-                <h3 className="font-semibold mb-2">{label} — Estatísticas</h3>
-                <p className="text-sm text-gray-300">Média: <span className="text-white font-mono">{s.avg}</span></p>
-                <p className="text-sm text-gray-300">Máximo: <span className="text-white font-mono">{s.max}</span></p>
-                <p className="text-sm text-gray-300">Mínimo: <span className="text-white font-mono">{s.min}</span></p>
+                <h3 className="font-semibold mb-2">{label} - Estatisticas</h3>
+                <p className="text-sm text-gray-300">Media: <span className="text-white font-mono">{s.avg}</span></p>
+                <p className="text-sm text-gray-300">Maximo: <span className="text-white font-mono">{s.max}</span></p>
+                <p className="text-sm text-gray-300">Minimo: <span className="text-white font-mono">{s.min}</span></p>
               </div>
             )
           })}
         </div>
       )}
 
-      {/* Gráfico Accel X */}
+      {/* Grafico Accel X */}
       <div className="bg-gray-800 p-4 rounded-lg mb-4">
-        <h2 className="text-lg font-semibold mb-2 text-blue-400">📈 Accel X</h2>
+        <h2 className="text-lg font-semibold mb-2 text-blue-400">Accel X</h2>
         <ResponsiveContainer width="100%" height={200}>
           <LineChart data={data}>
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
@@ -198,9 +291,9 @@ TEMPERATURA:
         </ResponsiveContainer>
       </div>
 
-      {/* Gráfico Accel Y */}
+      {/* Grafico Accel Y */}
       <div className="bg-gray-800 p-4 rounded-lg mb-4">
-        <h2 className="text-lg font-semibold mb-2 text-green-400">📈 Accel Y</h2>
+        <h2 className="text-lg font-semibold mb-2 text-green-400">Accel Y</h2>
         <ResponsiveContainer width="100%" height={200}>
           <LineChart data={data}>
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
@@ -212,9 +305,9 @@ TEMPERATURA:
         </ResponsiveContainer>
       </div>
 
-      {/* Gráfico Accel Z */}
+      {/* Grafico Accel Z */}
       <div className="bg-gray-800 p-4 rounded-lg mb-6">
-        <h2 className="text-lg font-semibold mb-2 text-red-400">📈 Accel Z</h2>
+        <h2 className="text-lg font-semibold mb-2 text-red-400">Accel Z</h2>
         <ResponsiveContainer width="100%" height={200}>
           <LineChart data={data}>
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
@@ -226,37 +319,37 @@ TEMPERATURA:
         </ResponsiveContainer>
       </div>
 
-      {/* Relatório */}
+      {/* Relatorio */}
       <div className="bg-gray-800 p-4 rounded-lg mb-6">
-        <h2 className="text-xl font-semibold mb-4">📊 Gerar Relatório</h2>
+        <h2 className="text-xl font-semibold mb-4">Gerar Relatorio</h2>
         <div className="flex items-center gap-4">
           <select
             value={reportMinutes}
             onChange={(e) => setReportMinutes(Number(e.target.value))}
             className="bg-gray-700 text-white px-3 py-2 rounded"
           >
-            <option value={10}>Últimos 10 min</option>
-            <option value={30}>Últimos 30 min</option>
-            <option value={60}>Últimos 60 min</option>
+            <option value={10}>Ultimos 10 min</option>
+            <option value={30}>Ultimos 30 min</option>
+            <option value={60}>Ultimos 60 min</option>
           </select>
           <button
             onClick={() => generateReport(reportMinutes)}
             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold"
           >
-            ⬇️ Download Relatório
+            Download Relatorio
           </button>
         </div>
       </div>
 
       {/* Alarmes */}
       <div className="bg-gray-800 p-4 rounded-lg">
-        <h2 className="text-xl font-semibold mb-4">🚨 Alarmes</h2>
+        <h2 className="text-xl font-semibold mb-4">Alarmes</h2>
         <div className="flex items-center gap-4 mb-4">
-          <label>Threshold (±):</label>
+          <label>Threshold (+-)</label>
           <input
             type="number"
             value={threshold}
-            onChange={(e) => setThreshold(Number(e.target.value))}
+            onChange={(e) => handleThresholdChange(Number(e.target.value))}
             className="bg-gray-700 text-white px-3 py-1 rounded w-24"
           />
           <button
@@ -267,7 +360,7 @@ TEMPERATURA:
           </button>
         </div>
         {alarms.length === 0 ? (
-          <p className="text-green-400">✅ Sem alarmes activos</p>
+          <p className="text-green-400">Sem alarmes activos</p>
         ) : (
           <ul className="space-y-2 max-h-48 overflow-y-auto">
             {alarms.map((alarm, i) => (
